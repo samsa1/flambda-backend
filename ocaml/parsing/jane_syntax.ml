@@ -799,7 +799,7 @@ module N_ary_functions = struct
 
   type function_param_desc =
     | Pparam_val of arg_label * expression option * pattern
-    | Pparam_module of string loc * package_type
+    | Pparam_module of arg_label * string loc * package_type
     | Pparam_newtype of string loc * jkind_annotation option
 
   type function_param =
@@ -1054,14 +1054,14 @@ module N_ary_functions = struct
       in
       let pparam_desc = Pparam_newtype (newtype, jkind) in
       Some ({ pparam_desc; pparam_loc }, body)
-    | Pexp_functor (name, pck, body), None ->
+    | Pexp_functor (label, name, pck, body), None ->
       let pparam_loc : Location.t =
         { loc_ghost = true;
           loc_start = pexp_loc.loc_start;
           loc_end = (fst pck).loc.loc_end
         }
       in
-      let pparam_desc = Pparam_module (name, pck) in
+      let pparam_desc = Pparam_module (label, name, pck) in
       Some ({ pparam_desc; pparam_loc }, body)
     | _, None -> None
     | _, Some jkind ->
@@ -1215,8 +1215,8 @@ module N_ary_functions = struct
         | Pparam_val (label, default, pat) ->
           Ast_helper.Exp.fun_ label default pat body ~loc
           [@alert "-prefer_jane_syntax"]
-        | Pparam_module (n, pack) ->
-          Ast_helper.Exp.functor_ n pack body ~loc
+        | Pparam_module (label, n, pack) ->
+          Ast_helper.Exp.functor_ label n pack body ~loc
           [@alert "-prefer_jane_syntax"]
         | Pparam_newtype (newtype, jkind) -> (
           match jkind with

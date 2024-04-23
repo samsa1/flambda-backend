@@ -130,7 +130,7 @@ let rec add_type bv ty =
   | Ptyp_poly(_, t) -> add_type bv t
   | Ptyp_package pt -> add_package_type bv pt
   | Ptyp_extension e -> handle_extension e
-  | Ptyp_functor (_, pt, t2) -> add_package_type bv pt; add_type bv t2
+  | Ptyp_functor (_, _, pt, t2) -> add_package_type bv pt; add_type bv t2
 
 and add_type_jst bv : Jane_syntax.Core_type.t -> _ = function
   | Jtyp_layout typ -> add_type_jst_layouts bv typ
@@ -264,7 +264,7 @@ let rec add_expr bv exp =
       add_opt add_expr bv opte; add_expr (add_pattern bv p) e
   | Pexp_function pel ->
       add_cases bv pel
-  | Pexp_functor (_, pck_ty, e) ->
+  | Pexp_functor (_, _, pck_ty, e) ->
       add_package_type bv pck_ty;
       add_expr bv e
   | Pexp_apply(e, el) ->
@@ -397,7 +397,7 @@ and add_function_param bv : Jane_syntax.N_ary_functions.function_param -> _ =
     | Pparam_val (_, opte, pat) ->
       add_opt add_expr bv opte;
       add_pattern bv pat
-    | Pparam_module (_, pack_opt) ->
+    | Pparam_module (_, _, pack_opt) ->
       add_package_type bv pack_opt;
       bv
     | Pparam_newtype _ -> bv

@@ -547,6 +547,9 @@ rule token = parse
   | "~" (lowercase_latin1 identchar_latin1 * as name) ':'
       { warn_latin1 lexbuf;
         LABEL name }
+  | "~" (uppercase identchar * as name) ':'
+      { check_label_name lexbuf name;
+        ULABEL name }
   | "?"
       { QUESTION }
   | "?" (lowercase identchar * as name) ':'

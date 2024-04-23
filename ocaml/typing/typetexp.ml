@@ -953,7 +953,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             pack_fields = ptys;
             pack_txt = p;
            }) ty
-  | Ptyp_functor (name, (p, l), st) ->
+  | Ptyp_functor (lbl, name, (p, l), st) ->
     let path, mty, ptys =
       transl_package env ~policy ~row_context styp.ptyp_loc p l in
     let scoped_ident, cty =
@@ -972,10 +972,11 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
     in
     (* could be newty or Btype.newgenty *)
     let l' = List.map (fun (s, cty) -> (s.txt, cty.ctyp_type)) ptys in
-    let ty = Btype.newgenty (Tfunctor (ident, (path, l'), ctyp_type)) in
+    let lbl = transl_label lbl None in
+    let ty = Btype.newgenty (Tfunctor (lbl, ident, (path, l'), ctyp_type)) in
     (* could also use [Location.mkloc scoped_ident name.loc] *)
     (* TODO : need to choose what to use instead of sloc *)
-    ctyp (Ttyp_functor ({txt = scoped_ident; loc = name.loc}, {
+    ctyp (Ttyp_functor (lbl, {txt = scoped_ident; loc = name.loc}, {
                 pack_path = path;
                 pack_type = mty;
                 pack_fields = ptys;

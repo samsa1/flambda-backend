@@ -83,7 +83,7 @@ module Typ :
     val poly: ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
     val package: ?loc:loc -> ?attrs:attrs -> lid -> (lid * core_type) list
                  -> core_type
-    val functor_ : ?loc:loc -> ?attrs:attrs -> str
+    val functor_ : ?loc:loc -> ?attrs:attrs -> arg_label -> str
                  -> (lid * (lid * core_type) list) -> core_type -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
 
@@ -148,7 +148,7 @@ module Exp:
     [@@alert
       prefer_jane_syntax "Prefer Jane Syntax for constructing functions"]
 
-    val functor_: ?loc:loc -> ?attrs:attrs -> str -> package_type
+    val functor_: ?loc:loc -> ?attrs:attrs -> arg_label -> str -> package_type
       -> expression -> expression
     [@@alert
       prefer_jane_syntax "Prefer Jane Syntax for constructing functions"]

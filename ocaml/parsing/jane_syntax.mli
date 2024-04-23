@@ -220,7 +220,7 @@ module N_ary_functions : sig
         {{!Asttypes.arg_label.Optional}[Optional]} is allowed.
     *)
     | Pparam_module of
-        string Asttypes.loc * Parsetree.package_type
+        Asttypes.arg_label * string Asttypes.loc * Parsetree.package_type
         (** [Pparam_module (M, S)] represents the parameter [{M : S}]. *)
     | Pparam_newtype of
         string Asttypes.loc * Jane_asttypes.jkind_annotation option

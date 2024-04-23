@@ -905,8 +905,8 @@ let typ sub x =
         Ttyp_poly (List.map (var_jkind sub) vars, sub.typ sub ct)
     | Ttyp_package pack ->
         Ttyp_package (sub.package_type sub pack)
-    | Ttyp_functor (id, pack, t) ->
-        Ttyp_functor (map_loc sub id,
+    | Ttyp_functor (lbl, id, pack, t) ->
+        Ttyp_functor (lbl, map_loc sub id,
                       sub.package_type sub pack, sub.typ sub t)
   in
   let ctyp_attributes = sub.attributes sub x.ctyp_attributes in

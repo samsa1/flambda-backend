@@ -688,9 +688,10 @@ and raw_type_desc ppf = function
   | Tpackage (p, fl) ->
       fprintf ppf "@[<hov1>Tpackage(@,%a,@,%a)@]" path p
         raw_lid_type_list fl
-  | Tfunctor (name, (p, fl), ty) ->
-      fprintf ppf "@[<hov1>Tfunctor(%s,@,(%a,@,%a),@,%a)@]"
-        (Ident.name name) path p raw_lid_type_list fl raw_type ty
+  | Tfunctor (lab, name, (p, fl), ty) ->
+      fprintf ppf "@[<hov1>Tfunctor(\"%s\",@,%s,@,(%a,@,%a),@,%a)@]"
+        (string_of_label lab) (Ident.name name) path
+        p raw_lid_type_list fl raw_type ty
 and raw_row_fixed ppf = function
 | None -> fprintf ppf "None"
 | Some Types.Fixed_private -> fprintf ppf "Some Fixed_private"
@@ -1422,7 +1423,11 @@ let rec tree_of_typexp mode alloc_mode ty =
     | Tpackage (p, fl) ->
         let fl = tree_of_pack_fields mode fl in
         Otyp_module (tree_of_path (Some Module_type) p, fl)
-    | Tfunctor (id, (p, fl), ty) ->
+    | Tfunctor (lbl, id, (p, fl), ty) ->
+        let lbl =
+          if !print_labels || is_omittable lbl then outcome_label lbl
+          else Nolabel
+        in
         let fenv env =
           let mty = !Ctype.modtype_of_package env Location.none p fl in
           Env.add_module ~arg:true id Mp_present mty env
@@ -1430,7 +1435,7 @@ let rec tree_of_typexp mode alloc_mode ty =
         let id = ident_name (Some Module) id in
         let fl = tree_of_pack_fields mode fl in
         let ty = wrap_env fenv (tree_of_typexp mode Alloc.Const.legacy) ty in
-        Otyp_functor (Oide_ident id,
+        Otyp_functor (lbl, Oide_ident id,
                       (tree_of_path (Some Module_type) p, fl), ty)
   in
   if List.memq px !delayed then delayed := List.filter ((!=) px) !delayed;

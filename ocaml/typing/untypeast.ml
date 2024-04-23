@@ -586,6 +586,7 @@ let expression sub exp =
                       })
                    fp.fp_newtypes
                in
+               let parg_label = label fp.fp_arg_label in
                let pparam_desc =
                  if is_module_arg fp
                  then
@@ -594,10 +595,8 @@ let expression sub exp =
                        Tparam_module (pat, ptyp) -> (extract_name pat, ptyp)
                      | _ -> assert false
                    in
-                   let () = assert (fp.fp_arg_label = Nolabel) in
-                   Pparam_module (i, sub.package_type sub ptyp)
+                   Pparam_module (parg_label, i, sub.package_type sub ptyp)
                  else
-                   let parg_label = label fp.fp_arg_label in
                    let pat, default_arg =
                      match fp.fp_kind with
                      | Tparam_pat pat -> pat, None
@@ -1087,9 +1086,9 @@ let core_type sub ct =
     | Ttyp_package pack -> Ptyp_package (sub.package_type sub pack)
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension
-    | Ttyp_functor (name, pack, ct) ->
+    | Ttyp_functor (lbl, name, pack, ct) ->
         let name = Location.mkloc (Ident.name name.txt) name.loc in
-        Ptyp_functor (name, sub.package_type sub pack, sub.typ sub ct)
+        Ptyp_functor (label lbl, name, sub.package_type sub pack, sub.typ sub ct)
   in
   Typ.mk ~loc ~attrs:!attrs desc
 

@@ -299,7 +299,7 @@ val filter_arrow: Env.t -> type_expr -> arg_label -> force_tpoly:bool ->
            argument type be a [Tpoly] node is not enforced. Raises
            [Filter_arrow_failed] instead of [Unify].  *)
 val filter_functor:
-        Env.t -> type_expr ->
+        Env.t -> type_expr -> arg_label ->
         (Ident.t * (Path.t * (Longident.t * type_expr) list) * type_expr) option
         (* A special case of unification with [{M:P} -> 'a]  Raises
            [Filter_arrow_failed] instead of [Unify]. *)

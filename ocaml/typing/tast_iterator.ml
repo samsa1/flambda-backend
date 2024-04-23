@@ -652,7 +652,7 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
       sub.typ sub ct
   | Ttyp_package pack -> sub.package_type sub pack
   | Ttyp_call_pos -> ()
-  | Ttyp_functor (_, pack, ct) ->
+  | Ttyp_functor (_, _, pack, ct) ->
       sub.package_type sub pack;
       sub.typ sub ct
 

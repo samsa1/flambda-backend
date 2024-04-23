@@ -185,8 +185,9 @@ let rec core_type i ppf x =
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg
-  | Ptyp_functor (name, (li, l), ct2) ->
+  | Ptyp_functor (label, name, (li, l), ct2) ->
       line i ppf "Ptyp_functor\n";
+      arg_label i ppf label;
       line i ppf "\"%s\" : %a\n" name.txt fmt_longident_loc li;
       list i package_with ppf l;
       core_type i ppf ct2
@@ -267,8 +268,9 @@ and expression i ppf x =
   | Pexp_function l ->
       line i ppf "Pexp_function\n";
       list i case ppf l;
-  | Pexp_functor (name, (li, l), e) ->
+  | Pexp_functor (label, name, (li, l), e) ->
       line i ppf "Pexp_functor\n";
+      arg_label i ppf label;
       line i ppf "\"%s\" : %a\n" name.txt fmt_longident_loc li;
       list i package_with ppf l;
       expression i ppf e

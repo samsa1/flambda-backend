@@ -3373,6 +3373,10 @@ let rec list_labels_aux env visited ls ty_fun =
   else match get_desc ty with
     Tarrow ((l,_,_), _, ty_res, _) ->
       list_labels_aux env (TypeSet.add ty visited) (l::ls) ty_res
+  | Tfunctor (l, id, (p, fl), ty_res) ->
+    let mty = !Ctype.modtype_of_package env Location.none p fl in
+    let env = Env.add_module id Mp_present mty env in
+    list_labels_aux env (TypeSet.add ty visited) (l::ls) ty_res
   | _ ->
       List.rev ls, is_Tvar ty
 
@@ -3550,11 +3554,17 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
     match sargs with
     | [] -> ty_fun, mode_fun, List.rev rev_args
     | (lbl, Parg_module me) :: rest ->
-        let () = assert (lbl = Nolabel) in
         let (id, (p, fl), ty_res) =
           let ty_fun = expand_head env ty_fun in
           match get_desc ty_fun with
-            Tfunctor (id, pl, t) -> (id, pl, t)
+            Tfunctor (l, id, pl, t) when labels_match ~param:l ~arg:lbl ->
+              (id, pl, t)
+          | Tfunctor _ ->
+            if !Clflags.classic || not (has_label lbl ty_fun) then
+              raise (Error(me.pmod_loc, env,
+                           Apply_wrong_label(lbl, ty_fun, false)))
+            else
+              raise (Error(funct.exp_loc, env, Incoherent_label_order))
           | Tvar _ ->
               raise (Error(me.pmod_loc, env, Cannot_infer_functor_signature))
           | _ ->
@@ -3773,12 +3783,11 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
                 end
         in
         loop ty_ret ty_ret0 mode_ret ((l, arg) :: rev_args) remaining_sargs
-    | Tfunctor (id, (p, fl), ty_ret),
-      Tfunctor (id0, _, ty_ret0),
+    | Tfunctor (l, id, (p, fl), ty_ret),
+      Tfunctor (_, id0, _, ty_ret0),
       (_, _) :: _ ->
         let lv = get_level ty_fun' in
         let mode_arg = Alloc.legacy in
-        let l = Nolabel in
         let may_warn loc w =
           if not !warned && !Clflags.principal && lv <> generic_level
           then begin
@@ -5105,14 +5114,14 @@ let split_function_ty
     expected_inner_mode; expected_pat_mode
   }
 
-let split_function_mty env ty_expected
+let split_function_mty env ty_expected ~arg_label
     ~in_function ~is_first_val_param
   =
   let { ty_fun = { ty = ty_fun; explanation }; loc_fun; region_locked = _ } =
     in_function
   in
   with_local_level_iter ~post:generalize_structure begin fun () ->
-    match filter_functor env (instance ty_expected) with
+    match filter_functor env (instance ty_expected) arg_label with
     | None -> (None, [])
     | Some (_, _, ty) as o -> (o, [ty])
     | exception Filter_arrow_failed err ->
@@ -5557,7 +5566,7 @@ and type_expect_
               (try enforce_current_level env ty_arg
                with Unify _ -> assert false);
               ret_tvar env (TypeSet.add ty seen) ty_fun
-          | Tfunctor (id, (p, fl), ty_fun) ->
+          | Tfunctor (_, id, (p, fl), ty_fun) ->
               List.iter (fun (_, t) ->
                 try enforce_current_level env t with Unify _ -> assert false) fl;
               let mty = !Ctype.modtype_of_package env Location.none p fl in
@@ -6882,7 +6891,7 @@ and type_function
         params_contain_gadt = contains_gadt; newtypes = newtype :: newtypes;
         fun_alloc_mode; ret_info;
       }
-  | { pparam_desc = Pparam_module (name, (p, fl)); pparam_loc}
+  | { pparam_desc = Pparam_module (arg_label, name, (p, fl)); pparam_loc}
     :: rest ->
       let pack = {
         ptyp_desc = Ptyp_package(p, fl);
@@ -6916,16 +6925,17 @@ and type_function
                 | Pparam_newtype _ -> true)
               rest
       in
+      let arg_label = Typetexp.transl_label arg_label None in
       let id_expected_typ_opt =
-        match split_function_mty env ty_expected
+        match split_function_mty env ty_expected ~arg_label
           ~is_first_val_param:first ~in_function with
         | None -> None
         | Some (id, (path', fl'), ety) ->
           begin try
             unify env
-              (newty (Tfunctor (id, (path, fl),
+              (newty (Tfunctor (arg_label, id, (path, fl),
                       newvar (Jkind.any ~why:Dummy_jkind))))
-              (newty (Tfunctor (id, (path', fl'),
+              (newty (Tfunctor (arg_label, id, (path', fl'),
                       newvar (Jkind.any ~why:Dummy_jkind))))
           with Unify trace ->
               raise (Error(loc, env, Expr_type_clash(trace, None, None)))
@@ -6970,7 +6980,7 @@ and type_function
         instance_funct ~id_in:s_ident ~p_out:(Pident ident) ~fixed:false res_ty
       in
       let exp_type =
-          Btype.newgenty (Tfunctor (ident, (path, fl), res_ty)) in
+          Btype.newgenty (Tfunctor (arg_label, ident, (path, fl), res_ty)) in
       unify_exp_types loc env exp_type (instance ty_expected);
       let pat_desc = Tpat_var (s_ident, name, pv_uid, Value.disallow_right Value.legacy) in
       let pattern = {
@@ -7022,7 +7032,7 @@ and type_function
             fp_sort = fp_sort;
             fp_mode = Alloc.disallow_right Alloc.legacy;
             fp_curry = curry;
-            fp_arg_label = Nolabel;
+            fp_arg_label = arg_label;
             fp_param = ident;
             fp_partial = Total;
             fp_newtypes = newtypes;

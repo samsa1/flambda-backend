@@ -228,8 +228,8 @@ module T = struct
         package ~loc ~attrs (map_loc sub lid)
           (List.map (map_tuple (map_loc sub) (sub.typ sub)) l)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
-    | Ptyp_functor (s, (lid, l), t) ->
-        functor_ ~loc ~attrs (map_loc sub s)
+    | Ptyp_functor (lab, s, (lid, l), t) ->
+        functor_ ~loc ~attrs lab (map_loc sub s)
           (map_loc sub lid, List.map (map_tuple (map_loc sub) (sub.typ sub)) l)
           (sub.typ sub t)
 
@@ -607,9 +607,10 @@ module E = struct
         match desc with
         | Pparam_val (label, def, pat) ->
             Pparam_val (label, Option.map (sub.expr sub) def, sub.pat sub pat)
-        | Pparam_module (s, pack_ty) ->
+        | Pparam_module (label, s, pack_ty) ->
             Pparam_module
-              ( map_loc sub s
+              ( label
+              , map_loc sub s
               , map_tuple (map_loc sub)
                   (List.map (map_tuple (map_loc sub) (sub.typ sub)))
                   pack_ty
@@ -688,8 +689,8 @@ module E = struct
     | Pexp_fun (lab, def, p, e) ->
         (fun_ ~loc ~attrs lab (map_opt (sub.expr sub) def) (sub.pat sub p)
           (sub.expr sub e) [@alert "-prefer_jane_syntax"])
-    | Pexp_functor (name, pck_ty, e) ->
-        (functor_ ~loc ~attrs name
+    | Pexp_functor (lab, name, pck_ty, e) ->
+        (functor_ ~loc ~attrs lab name
           (map_tuple (map_loc sub)
             (List.map (map_tuple (map_loc sub) (sub.typ sub))) pck_ty)
           (sub.expr sub e) [@alert "-prefer_jane_syntax"])

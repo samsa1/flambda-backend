@@ -274,8 +274,9 @@ let rec core_type i ppf x =
       line i ppf "Ttyp_package %a\n" fmt_path s;
       list i package_with ppf l;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
-  | Ttyp_functor (id, { pack_path = s; pack_fields = l}, ct) ->
+  | Ttyp_functor (lab, id, { pack_path = s; pack_fields = l}, ct) ->
       line i ppf "Ttyp_functor\n";
+      arg_label i ppf lab;
       line i ppf "module \"%a\" : %a" fmt_ident id.txt fmt_path s;
       list i package_with ppf l;
       core_type i ppf ct  

@@ -803,7 +803,7 @@ let rec generalize_spine ty =
       set_level ty generic_level;
       memo := Mnil;
       List.iter generalize_spine tyl
-  | Tfunctor (_, (_, fl), ty') ->
+  | Tfunctor (_, _, (_, fl), ty') ->
       set_level ty generic_level;
       List.iter (fun (_, ty) -> generalize_spine ty) fl;
       generalize_spine ty'
@@ -853,12 +853,12 @@ let rec check_scope_escape env level ty =
         if Path.same p p' then raise_escape_exn (Module_type p);
         check_scope_escape env level
           (newty2 ~level:orig_level (Tpackage (p', fl)))
-    | Tfunctor (id, (p, fl), t) when level < Path.scope p ->
+    | Tfunctor (lbl, id, (p, fl), t) when level < Path.scope p ->
         let p' = normalize_package_path env p in
         if Path.same p p' then raise_escape_exn (Module_type p);
         check_scope_escape env level
-          (newty2 ~level:orig_level (Tfunctor (id, (p', fl), t)))
-    | Tfunctor (id, (p, fl), t) ->
+          (newty2 ~level:orig_level (Tfunctor (lbl, id, (p', fl), t)))
+    | Tfunctor (_, id, (p, fl), t) ->
         List.iter (fun (_, t) -> check_scope_escape env level t) fl;
         let mty = !modtype_of_package env Location.none p fl in
         let env = Env.add_module id Mp_present mty env in
@@ -959,12 +959,12 @@ let rec update_level env in_functor level expand ty =
           begin fun () ->
             iter_type_expr (update_level env in_functor level expand) ty
           end
-    | Tfunctor (id, (p, fl), t) when level < Path.scope p ->
+    | Tfunctor (lbl, id, (p, fl), t) when level < Path.scope p ->
         let p' = normalize_package_path env p in
         if Path.same p p' then raise_escape_exn (Module p);
-        set_type_desc ty (Tfunctor (id, (p', fl), t));
+        set_type_desc ty (Tfunctor (lbl, id, (p', fl), t));
         update_level env in_functor level expand ty
-    | Tfunctor (id, (p, fl), t) ->
+    | Tfunctor (_, id, (p, fl), t) ->
         List.iter (fun (_, t) -> update_level env in_functor level expand t) fl;
         let mty = !modtype_of_package env Location.none p fl in
         let env = Env.add_module id Mp_present mty env in
@@ -1186,7 +1186,7 @@ let compute_required_subst id ty =
     then ()
     else
       match get_desc inv.inv_type with
-      | Tfunctor (id', _, _) when Ident.same id id' -> ()
+      | Tfunctor (_, id', _, _) when Ident.same id id' -> ()
       | _ ->
         nodes := TypeSet.add inv.inv_type !nodes;
         List.iter add_all_parents inv.inv_parents
@@ -1194,7 +1194,7 @@ let compute_required_subst id ty =
   TypeHash.iter (fun ty inv ->
     match get_desc ty with
     | Tconstr (p, _, _) | Tobject (_, {contents = Some (p, _)})
-    | Tfunctor (_, (p, _), _) | Tpackage (p, _)
+    | Tfunctor (_, _, (p, _), _) | Tpackage (p, _)
       when Path.contains id p -> add_all_parents inv
     | _ -> ()) inverted;
   fun ty -> TypeSet.mem ty !nodes
@@ -1359,12 +1359,12 @@ let rec copy ?(in_functor=false) ?partial ?keep_names copy_scope ty =
           end
       | Tobject (ty1, _) when partial <> None ->
           Tobject (copy ty1, ref None)
-      | Tfunctor (id, (p, fl), ty) ->
+      | Tfunctor (lbl, id, (p, fl), ty) ->
           let fl = List.map (fun (li, ty) -> (li, copy ty)) fl in
           let ty =
             copy_raw ~in_functor:true ?partial ?keep_names copy_scope ty
           in
-          Tfunctor (id, (p, fl), ty)
+          Tfunctor (lbl, id, (p, fl), ty)
       | _ -> copy_type_desc ?keep_names copy desc
     in
     Transient_expr.set_stub_desc t desc';
@@ -1688,14 +1688,14 @@ let copy_sep_funct ~copy_scope ~id_in ~p_out ~fixed
         | Tpackage (p, fl) ->
             Tpackage (Path.subst id_in p_out p,
                   List.map (fun (n, ty) -> (n, copy_rec ~may_share:true ty)) fl)
-        | Tfunctor (id, (p, fl), ty) ->
+        | Tfunctor (lbl, id, (p, fl), ty) ->
             let ty =
               if Ident.same id_in id then ty
               else copy_rec ~may_share:true ty
             in
             let fl =
               List.map (fun (n, ty) -> (n, copy_rec ~may_share:true ty)) fl
-            in Tfunctor (id, (Path.subst id_in p_out p, fl), ty)
+            in Tfunctor (lbl, id, (Path.subst id_in p_out p, fl), ty)
         | Tfield (p, k, ty1, ty2) ->
             (* the kind is kept shared, see Btype.copy_type_desc *)
             Tfield (p, field_kind_internal_repr k,
@@ -2667,7 +2667,7 @@ let rec local_non_recursive_abbrev ~allow_rec strict visited env p ty =
         end
     | Tobject _ | Tvariant _ when not strict ->
         ()
-    | Tfunctor (id, (p', fl), t) ->
+    | Tfunctor (_, id, (p', fl), t) ->
       (* if Path.same p p' then raise Occur; *)
       let visited = get_id ty :: visited in
       List.iter (fun (_, ty) ->
@@ -2783,7 +2783,7 @@ let occur_univar_or_unscoped ?(inj_only=false) env ty =
       | Tpackage (p, _) | Tobject (_, {contents = Some (p, _)}) ->
           Path.unbounded_unscoped bound_id p;
           iter_type_expr (occur_rec env bound_uv bound_id) ty
-      | Tfunctor (id, (p, fl), ty) ->
+      | Tfunctor (_, id, (p, fl), ty) ->
           Path.unbounded_unscoped bound_id p;
           List.iter (fun (_, t) -> occur_rec env bound_uv bound_id t) fl;
           let mty = !modtype_of_package env Location.none p fl in
@@ -2911,12 +2911,12 @@ let identifier_escape env idl ty =
         when path_contains_one idl p <> None ->
           set_name nm None;
           occur ~ignore_mark:true idl ty
-      | Tfunctor (id, (p, fl), t) ->
+      | Tfunctor (lbl, id, (p, fl), t) ->
           begin match path_contains_one idl p with
           | Some i ->
               let p' = normalize_package_path env p in
               if Path.same p p' then raise_escape_exn (Module (Pident i));
-              set_type_desc ty (Tfunctor (id, (p', fl), ty));
+              set_type_desc ty (Tfunctor (lbl, id, (p', fl), ty));
               occur ~ignore_mark:true idl ty
           | None ->
               List.iter (fun (_, t) -> occur idl t) fl;
@@ -3249,7 +3249,8 @@ let rec mcomp type_pairs env t1 t2 =
                 raise Incompatible
             with Not_found -> ()
             end
-        | Tfunctor (_, _, t1), Tfunctor (_, _, t2) ->
+        | Tfunctor (l1, _, _, t1), Tfunctor (l2, _, _, t2)
+          when equivalent_with_nolabels l1 l2 ->
             mcomp type_pairs env t1 t2
         (*
         | (Tpackage (p1, n1, tl1), Tpackage (p2, n2, tl2)) when n1 = n2 ->
@@ -3803,7 +3804,11 @@ and unify3 env in_functor t1 t1' t2 t2' =
           | false, false -> link_commu ~inside:c1 c2
           | true, true -> ()
           end
-      | (Tfunctor (id1, (p1, fl1), ty1), Tfunctor (id2, (p2, fl2), ty2)) ->
+      | (Tfunctor (l1, id1, (p1, fl1), ty1), Tfunctor (l2, id2, (p2, fl2), ty2))
+           when
+             (l1 = l2 ||
+             (!Clflags.classic || in_pattern_mode ()) &&
+               equivalent_with_nolabels l1 l2) ->
             (* copyed from Tpackage, could be improved and factorized *)
             begin try
               unify_package !env (unify_list env in_functor)
@@ -4405,15 +4410,17 @@ let filter_arrow env t l ~force_tpoly =
   | _ ->
       raise (Filter_arrow_failed Not_a_function)
 
-let filter_functor env t =
+let filter_functor env t l =
   let t =
     try expand_head_trace env t
     with Unify_trace _trace ->
       assert false (* TODO *)
   in
   match get_desc t with
-  | Tfunctor (id, (p, fl), ct) ->
-    Some (id, (p, fl), ct)
+  | Tfunctor (l', id, (p, fl), ct)
+     when l = l' || !Clflags.classic && l = Nolabel &&
+       equivalent_with_nolabels l l' ->
+      Some (id, (p, fl), ct)
   | Tvar _ -> None
   | _ ->
       raise (Filter_arrow_failed Not_a_function)
@@ -4928,7 +4935,9 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               moregen inst_nongen variance type_pairs env u1 u2;
               moregen_alloc_mode (neg_variance variance) a1 a2;
               moregen_alloc_mode variance r1 r2
-          | (Tfunctor (id1, (p1, fl1), t1), Tfunctor (id2, (p2, fl2), t2)) ->
+          | (Tfunctor (l1, id1, (p1, fl1), t1), Tfunctor (l2, id2, (p2, fl2), t2)) when
+               (l1 = l2
+               || !Clflags.classic && equivalent_with_nolabels l1 l2) ->
               begin try
                 unify_package env (moregen_list inst_nongen variance type_pairs env)
                   (get_level t1') p1 fl1 (get_level t2') p2 fl2
@@ -5366,8 +5375,10 @@ let rec eqtype rename type_pairs subst env t1 t2 =
               eqtype rename type_pairs subst env u1 u2;
               eqtype_alloc_mode a1 a2;
               eqtype_alloc_mode r1 r2
-          | (Tfunctor (id1, (p1, fl1), t1), Tfunctor (id2, (p2, fl2), t2)) ->
-              begin try
+          | (Tfunctor (l1, id1, (p1, fl1), t1), Tfunctor (l2, id2, (p2, fl2), t2)) when
+               (l1 = l2
+                || !Clflags.classic && equivalent_with_nolabels l1 l2) ->
+            begin try
                 unify_package env (eqtype_list rename type_pairs subst env)
                   (get_level t1') p1 fl1 (get_level t2') p2 fl2
               with Not_found -> raise_unexplained_for Equality
@@ -5980,7 +5991,7 @@ let rec build_subtype env (visited : transient_expr list)
       if c > Unchanged
       then (newty (Tarrow((l,a',r'), t1', t2', commu_ok)), c)
       else (t, Unchanged)
-  | Tfunctor (id, (p, fl), ty) ->
+  | Tfunctor (lbl, id, (p, fl), ty) ->
       let tt = Transient_expr.repr t in
       if memq_warn tt visited then (t, Unchanged) else
       let visited = tt :: visited in
@@ -5988,7 +5999,7 @@ let rec build_subtype env (visited : transient_expr list)
       let env = Env.add_module id Mp_present mty env in
       let (ty, c) = build_subtype env visited loops posi level ty in
       if c > Unchanged
-      then (newty (Tfunctor (id, (p, fl), ty)), c)
+      then (newty (Tfunctor (lbl, id, (p, fl), ty)), c)
       else (t, Unchanged)
   | Ttuple labeled_tlist ->
       let tt = Transient_expr.repr t in
@@ -6209,7 +6220,9 @@ let rec subtype_rec env trace t1 t2 cstrs =
           (Subtype.Diff {got = u1; expected = u2} :: trace)
           u1 u2
           cstrs
-    | (Tfunctor(id1, (p1, fl1), u1), Tfunctor(id2, (p2, fl2), u2)) ->
+    | (Tfunctor(l1, id1, (p1, fl1), u1), Tfunctor(l2, id2, (p2, fl2), u2)) when
+         (l1 = l2
+          || !Clflags.classic && equivalent_with_nolabels l1 l2) ->
         (* copied with modifications from Tpackage case *)
         let ctxt = (env, Ident.get_id_pairs ()) in
         begin try

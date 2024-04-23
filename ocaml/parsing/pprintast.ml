@@ -349,6 +349,12 @@ let maybe_type_atat_modes pty ctxt f c =
   | Some m -> pp f "%a@ @@@@@ %a" (pty ctxt) c modes m
   | None -> pty ctxt f c
 
+let xxx_with_label pprint f (label, c) =
+  match label with
+  | Nolabel    -> pprint f c (* otherwise parenthesize *)
+  | Labelled s -> pp f "%s:%a" s pprint c
+  | Optional s -> pp f "?%s:%a" s pprint c
+
 (* c ['a,'b] *)
 let rec class_params_def ctxt f =  function
   | [] -> ()
@@ -356,11 +362,12 @@ let rec class_params_def ctxt f =  function
       pp f "[%a] " (* space *)
         (list (type_param ctxt) ~sep:",") l
 
-and type_with_label ctxt f (label, c) =
-  match label with
-  | Nolabel    -> maybe_modes_type core_type1 ctxt f c (* otherwise parenthesize *)
-  | Labelled s -> pp f "%s:%a" s (maybe_modes_type core_type1 ctxt) c
-  | Optional s -> pp f "?%s:%a" s (maybe_modes_type core_type1 ctxt) c
+and type_with_label ctxt = xxx_with_label (maybe_modes_type core_type1 ctxt)
+
+and package ctxt f (name, pack) =
+  pp f "{%s :@ %a}" name.txt (package_type ctxt) pack
+
+and package_with_label ctxt = xxx_with_label (package ctxt)
 
 and core_type ctxt f x =
   match Jane_syntax.Core_type.of_ast x with
@@ -375,9 +382,10 @@ and core_type ctxt f x =
     | Ptyp_arrow (l, ct1, ct2) ->
         pp f "@[<2>%a@;->@;%a@]" (* FIXME remove parens later *)
           (type_with_label ctxt) (l,ct1) (return_type ctxt) ct2
-    | Ptyp_functor (name, pack, ct) ->
-        pp f "@[<2>@[<hov2>{%s :@ %a}@]@;->@;%a@]" name.txt (package_type ctxt)
-          pack (core_type ctxt) ct
+    | Ptyp_functor (label, name, pack, ct) ->
+        pp f "@[<2>@[<hov2>%a@]@;->@;%a@]"
+          (package_with_label ctxt) (label, (name, pack))
+          (core_type ctxt) ct
     | Ptyp_alias (ct, s) ->
       pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct tyvar s
     | Ptyp_poly ([], ct) ->
@@ -843,9 +851,10 @@ and expression ?(jane_syntax_parens = false) ctxt f x =
           (pp_print_pexp_function ctxt "->") e
     | Pexp_function l ->
         pp f "@[<hv>function%a@]" (case_list ctxt) l
-    | Pexp_functor (l, mty, e) ->
-        pp f "@[<2>fun@;{%s@;%s@;%a}@;%a@]" l.txt ":"
-          (package_type ctxt) mty (pp_print_pexp_function ctxt "->") e
+    | Pexp_functor (lbl, l, mty, e) ->
+        pp f "@[<2>fun@;%a@;%a@]"
+          (package_with_label ctxt) (lbl, (l, mty))
+          (pp_print_pexp_function ctxt "->") e
     | Pexp_match (e, l) ->
         pp f "@[<hv0>@[<hv0>@[<2>match %a@]@ with@]%a@]"
           (expression reset_ctxt) e (case_list ctxt) l
@@ -2140,8 +2149,8 @@ and function_param ctxt f
   =
   match pparam_desc with
   | Pparam_val (a, b, c) -> label_exp ctxt f (a, b, c)
-  | Pparam_module (l, mty) ->
-      pp f "@[{%s : %a}@]" l.txt (package_type ctxt) mty
+  | Pparam_module (lbl, name, pck_ty) ->
+      pp f "@[%a@]" (package_with_label ctxt) (lbl, (name, pck_ty))
   | Pparam_newtype (ty, None) -> pp f "(type %s)" ty.txt
   | Pparam_newtype (ty, Some annot) ->
       pp f "(type %s : %a)" ty.txt jkind_annotation annot
